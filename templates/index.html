@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scriptorium | Lab Generator</title>
+
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet"/>
+</head>
+<body>
+
+<header>
+    <h1>SCRIPTORIUM</h1>
+    <p>Automated Lab Manual Generator for GNDEC</p>
+</header>
+
+<div class="main-grid">
+    <div class="form-panel">
+        <form id="scriptoriumForm" action="/generate_manual" method="POST" enctype="multipart/form-data">
+            
+            <div class="input-group">
+                <label>Full Name</label>
+                <input type="text" name="name" required oninput="updateLiveText('prevName', this.value)">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div class="input-group" style="flex:1;">
+                    <label>URN</label>
+                    <input type="text" name="urn" required>
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>CRN</label>
+                    <input type="text" name="crn" required>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Year</label>
+                    <select id="yearSelect" name="year" onchange="fetchSubjects()">
+                        <option value="">--Select--</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                    </select>
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Branch</label>
+                    <select id="branchSelect" name="branch" onchange="fetchSubjects()">
+                        <option value="">--Select--</option>
+                        <option value="IT">IT</option>
+                        <option value="CSE">CSE</option>
+                        <option value="ECE">ECE</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Subject</label>
+                <select id="subjectSelect" name="subject_id" onchange="fetchTeachers()" required>
+                    <option value="">Select Year & Branch first</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>Faculty Coordinator</label>
+                <select id="teacherSelect" name="teacher" required>
+                    <option value="">Select Subject first</option>
+                </select>
+            </div>
+
+            <div class="input-group optional-section">
+                <label style="display:inline-block; margin-right: 15px;">
+                    <input type="checkbox" name="has_index" id="hasIndex" checked onchange="togglePageNumOption()"> Include Index
+                </label>
+                
+                <span id="pageNumWrapper">
+                    <label style="display:inline-block; margin-right: 15px; color: #2563eb;">
+                        <input type="checkbox" name="has_page_numbers" checked> Page Numbers
+                    </label>
+                </span>
+
+                <label style="display:inline-block;">
+                    <input type="checkbox" name="has_theory" onchange="toggleTheory()"> Include Theory
+                </label>
+            </div>
+
+            <div class="input-group">
+                <label>Aim</label>
+                <textarea name="aim" oninput="updateLiveText('prevAim', this.value)"></textarea>
+            </div>
+
+            <div class="input-group hidden" id="theoryBox">
+                <label>Theory Content</label>
+                <textarea name="theory"></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>
+                    Procedure / Source Code 
+                    <button type="button" onclick="document.getElementById('fileInp').click()" style="padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 10px;">Upload File</button>
+                </label>
+                <input type="file" id="fileInp" class="hidden" onchange="handleFile(this, 'procArea')">
+                <textarea name="procedure" id="procArea" oninput="updateCodePreview(this.value)"></textarea>
+                
+                <div class="drop-zone" onclick="document.getElementById('proc_imgs').click()">Add Procedure Diagrams</div>
+                <input type="file" name="proc_images" id="proc_imgs" multiple class="hidden" accept="image/*" onchange="updateFiles('proc_imgs', 'procStatus')">
+                <div id="procStatus" class="file-status"></div>
+            </div>
+
+            <div class="input-group">
+                <label>Output Text</label>
+                <textarea name="output" oninput="updateLiveText('prevOutput', this.value)"></textarea>
+                
+                <div class="drop-zone" onclick="document.getElementById('out_imgs').click()">Add Output Screenshots</div>
+                <input type="file" name="output_images" id="out_imgs" multiple class="hidden" accept="image/*" onchange="updateFiles('out_imgs', 'outStatus')">
+                <div id="outStatus" class="file-status"></div>
+            </div>
+
+            <button type="submit">GENERATE PDF</button>
+        </form>
+    </div>
+
+    <div class="preview-panel">
+        <h2>Live Preview</h2>
+        <div id="previewContent">
+            <p><strong>Student:</strong> <span id="prevName">...</span></p>
+            <p><strong>Aim:</strong> <span id="prevAim" class="multi-line">...</span></p>
+            <hr>
+            <p><strong>Code Preview:</strong></p>
+            <pre><code id="prevCode" class="language-python"></code></pre>
+            <p><strong>Output:</strong> <span id="prevOutput" class="multi-line">...</span></p>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script>
+    function toggleTheory() { document.getElementById('theoryBox').classList.toggle('hidden'); }
+
+    function togglePageNumOption() {
+        const hasIndex = document.getElementById('hasIndex').checked;
+        const wrapper = document.getElementById('pageNumWrapper');
+        wrapper.style.display = hasIndex ? 'inline-block' : 'none';
+        if (!hasIndex) wrapper.querySelector('input').checked = false;
+    }
+
+    function updateFiles(inputId, statusId) {
+        const count = document.getElementById(inputId).files.length;
+        document.getElementById(statusId).innerText = count > 0 ? `${count} image(s) selected` : "";
+    }
+
+    function fetchSubjects() {
+        const year = document.getElementById('yearSelect').value;
+        const branch = document.getElementById('branchSelect').value;
+        if(!year || !branch) return;
+
+        fetch('/get_subjects', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({year: year, branch: branch})
+        })
+        .then(res => res.json())
+        .then(data => {
+            const sel = document.getElementById('subjectSelect');
+            sel.innerHTML = '<option value="">--Select Subject--</option>';
+            data.forEach(sub => { sel.innerHTML += `<option value="${sub.id}">${sub.name}</option>`; });
+        });
+    }
+
+    function fetchTeachers() {
+        const subId = document.getElementById('subjectSelect').value;
+        if(!subId) return;
+
+        fetch('/get_teachers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({subject_id: subId})
+        })
+        .then(res => res.json())
+        .then(data => {
+            const sel = document.getElementById('teacherSelect');
+            sel.innerHTML = '<option value="">--Select Faculty--</option>';
+            data.forEach(t => { sel.innerHTML += `<option value="${t.name}">${t.name}</option>`; });
+        });
+    }
+
+    function handleFile(input, targetId) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById(targetId).value = e.target.result;
+            updateCodePreview(e.target.result); 
+        };
+        reader.readAsText(file);
+    }
+
+    function updateLiveText(id, val) { document.getElementById(id).innerText = val; }
+
+    function updateCodePreview(val) {
+        const codeElem = document.getElementById('prevCode');
+        codeElem.textContent = val;
+        Prism.highlightElement(codeElem);
+    }
+
+    togglePageNumOption();
+</script>
+
+</body>
+</html>
