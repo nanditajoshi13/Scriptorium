@@ -1,76 +1,89 @@
-from flask import Flask, render_template, request, jsonify, send_file
-import db_handler
-from pdf_generator import ScriptoriumPDF
 import os
+import uuid
+from flask import Flask, render_template, request, jsonify, send_file
+from db_handler import get_subjects, get_teachers
+from pdf_generator import generate_manual
 
 app = Flask(__name__)
 
-BASE_PATH = os.path.abspath(os.path.dirname(__file__))
-OUTPUT_DIR = os.path.join(BASE_PATH, 'generated_manuals')
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+MANUALS_FOLDER = os.path.join(BASE_DIR, 'generated_manuals')
 
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(MANUALS_FOLDER, exist_ok=True)
+
+BRANCH_MAP = {
+    "IT": "Information Technology", 
+    "CSE": "Computer Science Engineering", 
+    "ECE": "Electronics and Communication Engineering"
+}
 
 @app.route('/')
-def index():
+def index(): 
     return render_template('index.html')
 
-@app.route('/get_subjects', methods=['POST'])
-def get_subjects():
-    data = request.json
-    return jsonify(db_handler.get_subjects(data.get('year'), data.get('branch')))
+@app.route('/get_subjects_list/<int:year>/<branch>')
+def get_subjects_list(year, branch): 
+    return jsonify(get_subjects(year, branch))
 
-@app.route('/get_teachers', methods=['POST'])
-def get_teachers():
-    data = request.json
-    return jsonify(db_handler.get_teachers(data.get('subject_id')))
+@app.route('/get_teachers_list/<int:subject_id>')
+def get_teachers_list(subject_id): 
+    return jsonify(get_teachers(subject_id))
 
-@app.route('/generate_manual', methods=['POST'])
-def generate_manual():
-    form_data = request.form.to_dict()
+@app.route('/upload-img', methods=['POST'])
+def upload_img():
+    f = request.files.get('file')
+    if f:
+        filename = f"{uuid.uuid4()}_{f.filename}"
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        f.save(path)
+        return jsonify({"status": "success", "path": path})
+    return jsonify({"status": "error"}), 400
+
+@app.route('/generate', methods=['POST'])
+def generate():
+    b_short = request.form.get('branch')
     
-    form_data['has_index'] = 'has_index' in request.form
-    form_data['has_theory'] = 'has_theory' in request.form
-    form_data['has_page_numbers'] = 'has_page_numbers' in request.form
+    data = {
+        'name': request.form.get('name'), 
+        'urn': request.form.get('urn'), 
+        'crn': request.form.get('crn'),
+        'class_sec': request.form.get('class_sec'), 
+        'branch_short': b_short,
+        'branch_full': BRANCH_MAP.get(b_short, b_short), 
+        'subject': request.form.get('subject_name'),
+        'teacher': request.form.get('teacher'), 
+        'needs_index': 'needs_index' in request.form,
+        'index_page_col': 'index_page_col' in request.form, 
+        'experiments': []
+    }
 
-    sub_id = form_data.get('subject_id')
-    subjects = db_handler.get_subjects(form_data.get('year'), form_data.get('branch'))
-    subject_name = next((s['name'] for s in subjects if str(s['id']) == str(sub_id)), "Laboratory Record")
-    form_data['subject_name'] = subject_name
+    nums = request.form.getlist('exp_number[]')
+    aims = request.form.getlist('exp_aim[]')
+    apps = request.form.getlist('exp_apparatus[]')
+    theos = request.form.getlist('exp_theory[]')
+    codes = request.form.getlist('exp_code[]')
 
-    def get_images(key):
-        paths = []
-        if key in request.files:
-            for i, f in enumerate(request.files.getlist(key)):
-                if f.filename:
-                    safe_filename = f"temp_{key}_{i}_{f.filename.replace(' ', '_')}"
-                    p = os.path.join(OUTPUT_DIR, safe_filename)
-                    f.save(p)
-                    paths.append(p)
-        return paths
+    for i in range(len(nums)):
+        data['experiments'].append({
+            'number': nums[i], 
+            'aim': aims[i], 
+            'apparatus': apps[i] if i < len(apps) else "", 
+            'theory': theos[i] if i < len(theos) else "", 
+            'code': codes[i],
+            'include_theory': f'include_theory[{i}]' in request.form, 
+            'include_apparatus': f'include_apparatus[{i}]' in request.form,
+            'images': request.form.getlist(f'exp_images[{i}][]')
+        })
 
-    proc_paths = get_images('proc_images')
-    out_paths = get_images('output_images')
-
-    safe_user_name = form_data.get('name', 'User').replace(' ', '_')
-    filename = f"{safe_user_name}_Manual.pdf"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-
-    try:
-        pdf = ScriptoriumPDF(form_data)
-        pdf.generate(filepath, proc_images=proc_paths, out_images=out_paths)
-        
-        response = send_file(filepath, as_attachment=True)
-        
-        for p in proc_paths + out_paths:
-            if os.path.exists(p):
-                os.remove(p)
-                
-        return response
-
-    except Exception as e:
-        print(f"Deployment Error: {e}")
-        return f"Error: {e}", 500
+    pdf_path = generate_manual(data)
+    
+    full_path = os.path.abspath(pdf_path)
+    if os.path.exists(full_path):
+        return send_file(full_path, as_attachment=True)
+    return "Error: Generated file not found.", 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
