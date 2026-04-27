@@ -3,208 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scriptorium | Lab Generator</title>
-
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>SCRIPTORIUM | GNDEC Manual Architect</title>
     
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    
+    <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css" type="text/css" />
 </head>
 <body>
 
-<header>
-    <h1>SCRIPTORIUM</h1>
-    <p>Automated Lab Manual Generator for GNDEC</p>
-</header>
-
-<div class="main-grid">
-    <div class="form-panel">
-        <form id="scriptoriumForm" action="/generate_manual" method="POST" enctype="multipart/form-data">
-            
-            <div class="input-group">
-                <label>Full Name</label>
-                <input type="text" name="name" required oninput="updateLiveText('prevName', this.value)">
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                <div class="input-group" style="flex:1;">
-                    <label>URN</label>
-                    <input type="text" name="urn" required>
-                </div>
-                <div class="input-group" style="flex:1;">
-                    <label>CRN</label>
-                    <input type="text" name="crn" required>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                <div class="input-group" style="flex:1;">
-                    <label>Year</label>
-                    <select id="yearSelect" name="year" onchange="fetchSubjects()">
-                        <option value="">--Select--</option>
-                        <option value="2">2nd Year</option>
-                        <option value="3">3rd Year</option>
-                    </select>
-                </div>
-                <div class="input-group" style="flex:1;">
-                    <label>Branch</label>
-                    <select id="branchSelect" name="branch" onchange="fetchSubjects()">
-                        <option value="">--Select--</option>
-                        <option value="IT">IT</option>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label>Subject</label>
-                <select id="subjectSelect" name="subject_id" onchange="fetchTeachers()" required>
-                    <option value="">Select Year & Branch first</option>
-                </select>
-            </div>
-
-            <div class="input-group">
-                <label>Faculty Coordinator</label>
-                <select id="teacherSelect" name="teacher" required>
-                    <option value="">Select Subject first</option>
-                </select>
-            </div>
-
-            <div class="input-group optional-section">
-                <label style="display:inline-block; margin-right: 15px;">
-                    <input type="checkbox" name="has_index" id="hasIndex" checked onchange="togglePageNumOption()"> Include Index
-                </label>
-                
-                <span id="pageNumWrapper">
-                    <label style="display:inline-block; margin-right: 15px; color: #2563eb;">
-                        <input type="checkbox" name="has_page_numbers" checked> Page Numbers
-                    </label>
-                </span>
-
-                <label style="display:inline-block;">
-                    <input type="checkbox" name="has_theory" onchange="toggleTheory()"> Include Theory
-                </label>
-            </div>
-
-            <div class="input-group">
-                <label>Aim</label>
-                <textarea name="aim" oninput="updateLiveText('prevAim', this.value)"></textarea>
-            </div>
-
-            <div class="input-group hidden" id="theoryBox">
-                <label>Theory Content</label>
-                <textarea name="theory"></textarea>
-            </div>
-
-            <div class="input-group">
-                <label>
-                    Procedure / Source Code 
-                    <button type="button" onclick="document.getElementById('fileInp').click()" style="padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 10px;">Upload File</button>
-                </label>
-                <input type="file" id="fileInp" class="hidden" onchange="handleFile(this, 'procArea')">
-                <textarea name="procedure" id="procArea" oninput="updateCodePreview(this.value)"></textarea>
-                
-                <div class="drop-zone" onclick="document.getElementById('proc_imgs').click()">Add Procedure Diagrams</div>
-                <input type="file" name="proc_images" id="proc_imgs" multiple class="hidden" accept="image/*" onchange="updateFiles('proc_imgs', 'procStatus')">
-                <div id="procStatus" class="file-status"></div>
-            </div>
-
-            <div class="input-group">
-                <label>Output Text</label>
-                <textarea name="output" oninput="updateLiveText('prevOutput', this.value)"></textarea>
-                
-                <div class="drop-zone" onclick="document.getElementById('out_imgs').click()">Add Output Screenshots</div>
-                <input type="file" name="output_images" id="out_imgs" multiple class="hidden" accept="image/*" onchange="updateFiles('out_imgs', 'outStatus')">
-                <div id="outStatus" class="file-status"></div>
-            </div>
-
-            <button type="submit">GENERATE PDF</button>
-        </form>
+<div class="container">
+    <div class="header-section">
+        <h1>SCRIPTORIUM</h1>
+        <p>Institutional Practical File Architect</p>
     </div>
-
-    <div class="preview-panel">
-        <h2>Live Preview</h2>
-        <div id="previewContent">
-            <p><strong>Student:</strong> <span id="prevName">...</span></p>
-            <p><strong>Aim:</strong> <span id="prevAim" class="multi-line">...</span></p>
-            <hr>
-            <p><strong>Code Preview:</strong></p>
-            <pre><code id="prevCode" class="language-python"></code></pre>
-            <p><strong>Output:</strong> <span id="prevOutput" class="multi-line">...</span></p>
+    
+    <form action="/generate" method="POST" id="manualForm">
+        
+        <div class="section-box">
+            <h3>I. Front Page Identification</h3>
+            <div class="grid">
+                <div>
+                    <label>Candidate Name:</label>
+                    <input type="text" name="name" placeholder="Full Name" required>
+                    <label>University Roll No (URN):</label>
+                    <input type="text" name="urn" placeholder="e.g. 2435603" required>
+                    <label>College Roll No (CRN):</label>
+                    <input type="text" name="crn" placeholder="e.g. 2421122" required>
+                    <label>Class & Section:</label>
+                    <input type="text" name="class_sec" placeholder="e.g. D2ITB2" required>
+                </div>
+                <div>
+                    <label>Academic Branch:</label>
+                    <select name="branch" id="branchSelect" required>
+                        <option value="">-- Select Branch --</option>
+                        <option value="IT">Information Technology</option>
+                        <option value="CSE">Computer Science Engineering</option>
+                        <option value="ECE">Electronics & Communication</option>
+                    </select>
+                    <label>Academic Year:</label>
+                    <select name="year" id="yearSelect" required>
+                        <option value="">-- Select Year --</option>
+                        <option value="2">2nd Year (4th Sem)</option>
+                        <option value="3">3rd Year (6th Sem)</option>
+                        <option value="4">4th Year (8th Sem)</option>
+                    </select>
+                    <label>Subject:</label>
+                    <select name="subject_id" id="subjectSelect" required>
+                        <option value="">Select Year & Branch first</option>
+                    </select>
+                    <input type="hidden" name="subject_name" id="subNameHidden">
+                    <label>Submitted To:</label>
+                    <select name="teacher" id="teacherSelect" required>
+                        <option value="">Select Subject first</option>
+                    </select>
+                </div>
+            </div>
         </div>
-    </div>
+
+        <div class="section-box">
+            <h3>II. Document Configuration</h3>
+            <div class="toggle-group">
+                <label style="margin: 0;"><input type="checkbox" name="needs_index" id="indexToggle" checked> Include Index Page</label>
+                <label style="margin: 0; padding-left: 20px; border-left: 1px solid #ccc;">
+                    <input type="checkbox" name="index_page_col" id="pageColToggle"> Add Page No. Column
+                </label>
+            </div>
+        </div>
+
+        <div id="exp-container">
+            <div class="exp-card">
+                <h3>Experiment Construction</h3>
+                <div style="display: flex; gap: 20px;">
+                    <div style="width: 120px;">
+                        <label>Exp #:</label>
+                        <input type="text" name="exp_number[]" value="1">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Aim:</label>
+                        <textarea name="exp_aim[]" rows="2" required placeholder="Enter experiment objective..."></textarea>
+                    </div>
+                </div>
+
+                <div class="toggle-group">
+                    <label><input type="checkbox" class="toggle-section" data-target="app-0" name="include_apparatus[0]"> Include Apparatus</label>
+                    <label><input type="checkbox" class="toggle-section" data-target="theo-0" name="include_theory[0]"> Include Theory</label>
+                </div>
+
+                <div id="app-0" style="display:none">
+                    <label>Apparatus / Requirements:</label>
+                    <div id="edit-app-0" class="editor-container"></div>
+                    <input type="hidden" name="exp_apparatus[]" id="hid-app-0">
+                </div>
+
+                <div id="theo-0" style="display:none">
+                    <label>Theory:</label>
+                    <div id="edit-theo-0" class="editor-container"></div>
+                    <input type="hidden" name="exp_theory[]" id="hid-theo-0">
+                </div>
+
+                <label>Source Code:</label>
+                <textarea name="exp_code[]" rows="10" style="font-family: monospace; background:#1e1e1e; color:#d4d4d4; padding:10px;"></textarea>
+
+                <label>Output Screenshots:</label>
+                <div class="dropzone" id="dz-out-0"></div>
+                <div id="img-paths-0"></div> 
+            </div>
+        </div>
+
+        <button type="submit" class="submit-btn">GENERATE FORMAL PDF MANUAL</button>
+    </form>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 <script>
-    function toggleTheory() { document.getElementById('theoryBox').classList.toggle('hidden'); }
+    const config = {
+        theme: 'snow',
+        modules: { toolbar: [['bold', 'italic', 'underline'], [{ 'list': 'ordered'}, { 'list': 'bullet' }], ['image', 'clean']] }
+    };
+    const quillApp = new Quill('#edit-app-0', config);
+    const quillTheo = new Quill('#edit-theo-0', config);
 
-    function togglePageNumOption() {
-        const hasIndex = document.getElementById('hasIndex').checked;
-        const wrapper = document.getElementById('pageNumWrapper');
-        wrapper.style.display = hasIndex ? 'inline-block' : 'none';
-        if (!hasIndex) wrapper.querySelector('input').checked = false;
+    const indexToggle = document.getElementById('indexToggle');
+    const pageColToggle = document.getElementById('pageColToggle');
+    pageColToggle.disabled = !indexToggle.checked;
+    indexToggle.addEventListener('change', () => {
+        pageColToggle.disabled = !indexToggle.checked;
+        if (!indexToggle.checked) pageColToggle.checked = false;
+    });
+
+    const branchSel = document.getElementById('branchSelect');
+    const yearSel = document.getElementById('yearSelect');
+    const subSel = document.getElementById('subjectSelect');
+    const teachSel = document.getElementById('teacherSelect');
+
+    async function loadSubjects() {
+        if (!branchSel.value || !yearSel.value) return;
+        const res = await fetch(`/get_subjects_list/${yearSel.value}/${branchSel.value}`);
+        const data = await res.json();
+        subSel.innerHTML = '<option value="">-- Select Subject --</option>';
+        data.forEach(s => subSel.innerHTML += `<option value="${s.id}">${s.name}</option>`);
     }
 
-    function updateFiles(inputId, statusId) {
-        const count = document.getElementById(inputId).files.length;
-        document.getElementById(statusId).innerText = count > 0 ? `${count} image(s) selected` : "";
-    }
+    subSel.addEventListener('change', async () => {
+        if(!subSel.value) return;
+        document.getElementById('subNameHidden').value = subSel.options[subSel.selectedIndex].text;
+        const res = await fetch(`/get_teachers_list/${subSel.value}`);
+        const data = await res.json();
+        teachSel.innerHTML = '<option value="">-- Select Teacher --</option>';
+        data.forEach(t => teachSel.innerHTML += `<option value="${t.name}">${t.name}</option>`);
+    });
 
-    function fetchSubjects() {
-        const year = document.getElementById('yearSelect').value;
-        const branch = document.getElementById('branchSelect').value;
-        if(!year || !branch) return;
+    branchSel.addEventListener('change', loadSubjects);
+    yearSel.addEventListener('change', loadSubjects);
 
-        fetch('/get_subjects', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({year: year, branch: branch})
-        })
-        .then(res => res.json())
-        .then(data => {
-            const sel = document.getElementById('subjectSelect');
-            sel.innerHTML = '<option value="">--Select Subject--</option>';
-            data.forEach(sub => { sel.innerHTML += `<option value="${sub.id}">${sub.name}</option>`; });
+    document.querySelectorAll('.toggle-section').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            document.getElementById(e.target.dataset.target).style.display = e.target.checked ? 'block' : 'none';
         });
-    }
+    });
 
-    function fetchTeachers() {
-        const subId = document.getElementById('subjectSelect').value;
-        if(!subId) return;
+    Dropzone.autoDiscover = false;
+    const dz = new Dropzone("#dz-out-0", { 
+        url: "/upload-img",
+        dictDefaultMessage: "Drag Output Images Here",
+        success: (file, res) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'exp_images[0][]';
+            input.value = res.path;
+            document.getElementById('img-paths-0').appendChild(input);
+        }
+    });
 
-        fetch('/get_teachers', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({subject_id: subId})
-        })
-        .then(res => res.json())
-        .then(data => {
-            const sel = document.getElementById('teacherSelect');
-            sel.innerHTML = '<option value="">--Select Faculty--</option>';
-            data.forEach(t => { sel.innerHTML += `<option value="${t.name}">${t.name}</option>`; });
-        });
-    }
-
-    function handleFile(input, targetId) {
-        const file = input.files[0];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            document.getElementById(targetId).value = e.target.result;
-            updateCodePreview(e.target.result); 
-        };
-        reader.readAsText(file);
-    }
-
-    function updateLiveText(id, val) { document.getElementById(id).innerText = val; }
-
-    function updateCodePreview(val) {
-        const codeElem = document.getElementById('prevCode');
-        codeElem.textContent = val;
-        Prism.highlightElement(codeElem);
-    }
-
-    togglePageNumOption();
+    document.getElementById('manualForm').onsubmit = function() {
+        document.getElementById('hid-app-0').value = quillApp.root.innerHTML;
+        document.getElementById('hid-theo-0').value = quillTheo.root.innerHTML;
+        return true; 
+    };
 </script>
 
 </body>
